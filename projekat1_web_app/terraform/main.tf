@@ -1,11 +1,22 @@
+provider "aws" {
+  region = var.aws_region
+}
+
 resource "aws_vpc" "main" {
   cidr_block = "10.0.0.0/16"
 }
 
-resource "aws_subnet" "public" {
+resource "aws_subnet" "public_a" {
   vpc_id                  = aws_vpc.main.id
   cidr_block              = "10.0.1.0/24"
   availability_zone       = "us-east-1a"
+  map_public_ip_on_launch = true
+}
+
+resource "aws_subnet" "public_b" {
+  vpc_id                  = aws_vpc.main.id
+  cidr_block              = "10.0.2.0/24"
+  availability_zone       = "us-east-1b"
   map_public_ip_on_launch = true
 }
 
@@ -22,8 +33,13 @@ resource "aws_route_table" "public_rt" {
   }
 }
 
-resource "aws_route_table_association" "public_assoc" {
-  subnet_id      = aws_subnet.public.id
+resource "aws_route_table_association" "public_assoc_a" {
+  subnet_id      = aws_subnet.public_a.id
+  route_table_id = aws_route_table.public_rt.id
+}
+
+resource "aws_route_table_association" "public_assoc_b" {
+  subnet_id      = aws_subnet.public_b.id
   route_table_id = aws_route_table.public_rt.id
 }
 
@@ -64,7 +80,7 @@ resource "aws_security_group" "app_sg" {
 resource "aws_instance" "app" {
   ami                    = "ami-053b0d53c279acc90" # Ubuntu 22.04 LTS za us-east-1
   instance_type          = var.instance_type
-  subnet_id              = aws_subnet.public.id
+  subnet_id              = aws_subnet.public_a.id
   vpc_security_group_ids = [aws_security_group.app_sg.id]
   key_name               = var.key_name
 
@@ -75,10 +91,13 @@ resource "aws_instance" "app" {
               systemctl start docker
               systemctl enable docker
 
-              # Formatiraj i montiraj EBS volumen
-              mkfs.ext4 /dev/xvdf
+              # Provjeri da li je /dev/xvdf formatiran i montiran
+              if ! blkid /dev/xvdf; then
+                mkfs.ext4 /dev/xvdf
+              fi
+
               mkdir -p /mnt/data
-              mount /dev/xvdf /mnt/data
+              mountpoint -q /mnt/data || mount /dev/xvdf /mnt/data
               chown -R ubuntu:ubuntu /mnt/data
 
               # Kreiraj docker named volume i bindaj ga na EBS
@@ -97,7 +116,6 @@ resource "aws_instance" "app" {
   }
 }
 
-
 resource "aws_ebs_volume" "db_volume" {
   availability_zone = "us-east-1a"
   size              = 1
@@ -113,7 +131,7 @@ resource "aws_lb" "app_lb" {
   name               = "app-lb"
   internal           = false
   load_balancer_type = "application"
-  subnets            = [aws_subnet.public.id]
+  subnets            = [aws_subnet.public_a.id, aws_subnet.public_b.id]
   security_groups    = [aws_security_group.app_sg.id]
 }
 
@@ -137,7 +155,7 @@ resource "aws_lb_listener" "http" {
   protocol          = "HTTP"
 
   default_action {
-    type             = "fixed-response"
+    type = "fixed-response"
     fixed_response {
       content_type = "text/plain"
       message_body = "404 Not Found"
@@ -176,4 +194,16 @@ resource "aws_lb_listener_rule" "backend_rule" {
       values = ["/api/*"]
     }
   }
+}
+
+resource "aws_lb_target_group_attachment" "frontend_attach" {
+  target_group_arn = aws_lb_target_group.frontend_tg.arn
+  target_id        = aws_instance.app.id
+  port             = 3000
+}
+
+resource "aws_lb_target_group_attachment" "backend_attach" {
+  target_group_arn = aws_lb_target_group.backend_tg.arn
+  target_id        = aws_instance.app.id
+  port             = 5000
 }

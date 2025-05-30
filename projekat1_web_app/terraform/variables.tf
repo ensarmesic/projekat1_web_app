@@ -1,13 +1,17 @@
 variable "aws_region" {
-  default = "us-east-1"  # ili tvoja sandbox regija
+  description = "AWS region to deploy resources"
+  type        = string
+  default     = "us-east-1"
 }
 
 variable "instance_type" {
-  default = "t2.micro"
+  description = "EC2 instance type"
+  type        = string
+  default     = "t2.micro"
 }
 
 variable "key_name" {
   description = "SSH key pair name"
-  default     = "sandbox-key"  # možeš ostaviti ovako ako ne koristiš SSH pristup
+  type        = string
+  default     = "labsuser"
 }
-
