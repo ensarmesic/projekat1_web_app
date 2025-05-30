@@ -82,7 +82,7 @@ resource "aws_instance" "app" {
   instance_type          = var.instance_type
   subnet_id              = aws_subnet.public_a.id
   vpc_security_group_ids = [aws_security_group.app_sg.id]
-  key_name               = var.key_name
+  //key_name               = var.key_name
 
   user_data = <<-EOF
               #!/bin/bash
@@ -133,14 +133,14 @@ resource "aws_lb" "app_lb" {
 }
 
 resource "aws_lb_target_group" "frontend_tg" {
-  name     = "frontend-tg"
+  name     = "frontend-tg-ensar"
   port     = 3000
   protocol = "HTTP"
   vpc_id   = aws_vpc.main.id
 }
 
 resource "aws_lb_target_group" "backend_tg" {
-  name     = "backend-tg"
+  name     = "backend-tg-ensar"
   port     = 5000
   protocol = "HTTP"
   vpc_id   = aws_vpc.main.id
