@@ -78,7 +78,7 @@ resource "aws_security_group" "app_sg" {
 }
 
 resource "aws_instance" "app" {
-  ami                    = "ami-053b0d53c279acc90" # Ubuntu 22.04 LTS za us-east-1
+  ami                    = "ami-053b0d53c279acc90"
   instance_type          = var.instance_type
   subnet_id              = aws_subnet.public_a.id
   vpc_security_group_ids = [aws_security_group.app_sg.id]
@@ -91,7 +91,6 @@ resource "aws_instance" "app" {
               systemctl start docker
               systemctl enable docker
 
-              # Provjeri da li je /dev/xvdf formatiran i montiran
               if ! blkid /dev/xvdf; then
                 mkfs.ext4 /dev/xvdf
               fi
@@ -100,12 +99,10 @@ resource "aws_instance" "app" {
               mountpoint -q /mnt/data || mount /dev/xvdf /mnt/data
               chown -R ubuntu:ubuntu /mnt/data
 
-              # Kreiraj docker named volume i bindaj ga na EBS
               docker volume create --name=mongo-data
               docker run --rm -v mongo-data:/from -v /mnt/data:/to alpine sh -c "cp -a /from/. /to/ && rm -rf /from/*"
               mount --bind /mnt/data /var/lib/docker/volumes/mongo-data/_data
 
-              # Kloniraj app i pokreni docker-compose
               git clone https://github.com/ensarmesic/projekat1_web_app.git /home/ubuntu/app
               cd /home/ubuntu/app
               docker-compose up -d
