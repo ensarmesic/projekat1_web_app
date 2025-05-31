@@ -85,28 +85,31 @@ resource "aws_security_group" "app_sg" {
 }
 
 resource "aws_instance" "app" {
-  ami                    = "ami-053b0d53c279acc90"
-  instance_type          = var.instance_type
-  subnet_id              = aws_subnet.public_a.id
-  vpc_security_group_ids = [aws_security_group.app_sg.id]
-  key_name               = var.key_name
+  ami                         = "ami-053b0d53c279acc90"
+  instance_type               = var.instance_type
+  subnet_id                   = aws_subnet.public_a.id
+  vpc_security_group_ids      = [aws_security_group.app_sg.id]
+  key_name                    = var.key_name
   associate_public_ip_address = true
 
   user_data = <<-EOF
               #!/bin/bash
               apt-get update -y
-              apt-get install -y docker.io git curl
+              apt-get install -y docker.io git curl ca-certificates gnupg lsb-release
+
               systemctl start docker
               systemctl enable docker
+              usermod -aG docker ubuntu
 
-              curl -L "https://github.com/docker/compose/releases/download/1.29.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-              chmod +x /usr/local/bin/docker-compose
-              ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose
+              mkdir -p /etc/apt/keyrings
+              curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+              echo "deb [arch=\$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \$(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+              apt-get update
+              apt-get install -y docker-compose-plugin
 
               if ! blkid /dev/xvdf; then
                 mkfs.ext4 /dev/xvdf
               fi
-
               mkdir -p /mnt/data
               mountpoint -q /mnt/data || mount /dev/xvdf /mnt/data
               chown -R ubuntu:ubuntu /mnt/data
@@ -116,8 +119,7 @@ resource "aws_instance" "app" {
               mount --bind /mnt/data /var/lib/docker/volumes/mongo-data/_data
 
               git clone https://github.com/ensarmesic/projekat1_web_app.git /home/ubuntu/app
-              cd /home/ubuntu/app
-              docker-compose up -d
+              runuser -l ubuntu -c "cd /home/ubuntu/app && docker compose up -d"
               EOF
 
   tags = {
