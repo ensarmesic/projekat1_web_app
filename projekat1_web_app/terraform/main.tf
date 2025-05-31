@@ -87,9 +87,13 @@ resource "aws_instance" "app" {
   user_data = <<-EOF
               #!/bin/bash
               apt-get update -y
-              apt-get install -y docker.io git
+              apt-get install -y docker.io git curl
               systemctl start docker
               systemctl enable docker
+
+              curl -L "https://github.com/docker/compose/releases/download/1.29.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+              chmod +x /usr/local/bin/docker-compose
+              ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose
 
               if ! blkid /dev/xvdf; then
                 mkfs.ext4 /dev/xvdf
@@ -137,6 +141,16 @@ resource "aws_lb_target_group" "frontend_tg" {
   port     = 3000
   protocol = "HTTP"
   vpc_id   = aws_vpc.main.id
+
+  health_check {
+    path                = "/"
+    protocol            = "HTTP"
+    interval            = 30
+    timeout             = 5
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+    matcher             = "200"
+  }
 }
 
 resource "aws_lb_target_group" "backend_tg" {
@@ -144,6 +158,16 @@ resource "aws_lb_target_group" "backend_tg" {
   port     = 5000
   protocol = "HTTP"
   vpc_id   = aws_vpc.main.id
+
+  health_check {
+    path                = "/api/health"
+    protocol            = "HTTP"
+    interval            = 30
+    timeout             = 5
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+    matcher             = "200"
+  }
 }
 
 resource "aws_lb_listener" "http" {
