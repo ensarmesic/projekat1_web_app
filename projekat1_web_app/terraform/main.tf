@@ -45,8 +45,15 @@ resource "aws_route_table_association" "public_assoc_b" {
 
 resource "aws_security_group" "app_sg" {
   name        = "app_sg"
-  description = "Allow HTTP, HTTPS, and custom app ports"
+  description = "Allow SSH, HTTP, and custom app ports"
   vpc_id      = aws_vpc.main.id
+
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
 
   ingress {
     from_port   = 3000
@@ -83,6 +90,7 @@ resource "aws_instance" "app" {
   subnet_id              = aws_subnet.public_a.id
   vpc_security_group_ids = [aws_security_group.app_sg.id]
   key_name               = var.key_name
+  associate_public_ip_address = true
 
   user_data = <<-EOF
               #!/bin/bash
