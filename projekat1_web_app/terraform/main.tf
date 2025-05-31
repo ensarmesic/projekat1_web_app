@@ -82,7 +82,7 @@ resource "aws_instance" "app" {
   instance_type          = var.instance_type
   subnet_id              = aws_subnet.public_a.id
   vpc_security_group_ids = [aws_security_group.app_sg.id]
-  //key_name               = var.key_name
+  key_name               = var.key_name
 
   user_data = <<-EOF
               #!/bin/bash
