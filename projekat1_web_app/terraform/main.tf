@@ -45,7 +45,7 @@ resource "aws_route_table_association" "public_assoc_b" {
 
 resource "aws_security_group" "app_sg" {
   name        = "app_sg"
-  description = "Allow SSH, HTTP, and custom app ports"
+  description = "Allow SSH, HTTP, and app ports"
   vpc_id      = aws_vpc.main.id
 
   ingress {
@@ -85,57 +85,29 @@ resource "aws_security_group" "app_sg" {
 }
 
 resource "aws_instance" "app" {
-  ami                         = "ami-053b0d53c279acc90"
-  instance_type               = var.instance_type
-  subnet_id                   = aws_subnet.public_a.id
-  vpc_security_group_ids      = [aws_security_group.app_sg.id]
-  key_name                    = var.key_name
+  ami                    = "ami-053b0d53c279acc90"
+  instance_type          = var.instance_type
+  subnet_id              = aws_subnet.public_a.id
+  vpc_security_group_ids = [aws_security_group.app_sg.id]
+  key_name               = var.key_name
   associate_public_ip_address = true
 
   user_data = <<-EOF
               #!/bin/bash
-              apt-get update -y
-              apt-get install -y docker.io git curl ca-certificates gnupg lsb-release
+              apt update -y
+              apt install -y docker.io git
 
               systemctl start docker
               systemctl enable docker
               usermod -aG docker ubuntu
 
-              mkdir -p /etc/apt/keyrings
-              curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-              echo "deb [arch=\$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \$(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
-              apt-get update
-              apt-get install -y docker-compose-plugin
-
-              if ! blkid /dev/xvdf; then
-                mkfs.ext4 /dev/xvdf
-              fi
-              mkdir -p /mnt/data
-              mountpoint -q /mnt/data || mount /dev/xvdf /mnt/data
-              chown -R ubuntu:ubuntu /mnt/data
-
-              docker volume create --name=mongo-data
-              docker run --rm -v mongo-data:/from -v /mnt/data:/to alpine sh -c "cp -a /from/. /to/ && rm -rf /from/*"
-              mount --bind /mnt/data /var/lib/docker/volumes/mongo-data/_data
-
-              git clone https://github.com/ensarmesic/projekat1_web_app.git /home/ubuntu/app
-              runuser -l ubuntu -c "cd /home/ubuntu/app && docker compose up -d"
+              su - ubuntu -c "git clone https://github.com/ensarmesic/projekat1_web_app.git ~/app"
+              su - ubuntu -c "cd ~/app && docker compose up -d"
               EOF
 
   tags = {
     Name = "AppInstance"
   }
-}
-
-resource "aws_ebs_volume" "db_volume" {
-  availability_zone = "us-east-1a"
-  size              = 1
-}
-
-resource "aws_volume_attachment" "db_attach" {
-  device_name = "/dev/xvdf"
-  volume_id   = aws_ebs_volume.db_volume.id
-  instance_id = aws_instance.app.id
 }
 
 resource "aws_lb" "app_lb" {
