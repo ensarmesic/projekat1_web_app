@@ -9,8 +9,8 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   
-  // Definisanje konstante za base URL
-  const API_URL = 'http://localhost:5000';
+  // API_URL sada koristi environment varijablu ili default na '/api' (ALB routa)
+  const API_URL = process.env.REACT_APP_API_URL || '/api';
 
   useEffect(function () {
     async function fetchData() {
@@ -29,14 +29,14 @@ function App() {
       } catch (err) {
         setError(
           err.message ||
-            'Fetching goals failed - the server responsed with an error.'
+            'Fetching goals failed - the server responded with an error.'
         );
       }
       setIsLoading(false);
     }
 
     fetchData();
-  }, []);
+  }, [API_URL]);
 
   async function addGoalHandler(goalText) {
     setIsLoading(true);
@@ -71,7 +71,7 @@ function App() {
     } catch (err) {
       setError(
         err.message ||
-          'Adding a goal failed - the server responsed with an error.'
+          'Adding a goal failed - the server responded with an error.'
       );
     }
     setIsLoading(false);
@@ -98,7 +98,7 @@ function App() {
     } catch (err) {
       setError(
         err.message ||
-          'Deleting the goal failed - the server responsed with an error.'
+          'Deleting the goal failed - the server responded with an error.'
       );
     }
     setIsLoading(false);

@@ -1,0 +1,6 @@
+aws_region     = "us-east-1"
+instance_type  = "t1.micro"
+key_pair_name  = "vockey"
+my_ip          = "109.175.107.179/32"
+repo_clone_url = "https://github.com/ensarmesic/projekat1_web_app.git"
+repo_name      = "projekat1_web_app"

@@ -1,3 +1,5 @@
+version: "3.8"
+
 services:
   frontend:
     build: ./frontend
@@ -10,6 +12,7 @@ services:
       - /app/node_modules
     environment:
       - CHOKIDAR_USEPOLLING=true
+      - REACT_APP_API_URL=/api
     networks:
       - app-network
 
@@ -29,8 +32,7 @@ services:
 
   mongo:
     image: mongo
-    ports:
-      - "27017:27017"
+    # ne mapiramo portove na host, baza je privatna
     volumes:
       - mongo-data:/data/db
     networks:
