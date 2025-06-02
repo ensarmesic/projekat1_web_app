@@ -12,7 +12,15 @@ resource "aws_subnet" "public" {
   cidr_block              = "10.0.1.0/24"
   availability_zone       = "${var.aws_region}a"
   map_public_ip_on_launch = true
-  tags = { Name = "public-subnet" }
+  tags = { Name = "public-subnet-1" }
+}
+
+resource "aws_subnet" "public2" {
+  vpc_id                  = aws_vpc.main.id
+  cidr_block              = "10.0.3.0/24"
+  availability_zone       = "${var.aws_region}b"
+  map_public_ip_on_launch = true
+  tags = { Name = "public-subnet-2" }
 }
 
 resource "aws_subnet" "private" {
@@ -38,8 +46,13 @@ resource "aws_route" "internet_access" {
   gateway_id             = aws_internet_gateway.igw.id
 }
 
-resource "aws_route_table_association" "public_subnet_association" {
+resource "aws_route_table_association" "public_subnet_association_1" {
   subnet_id      = aws_subnet.public.id
+  route_table_id = aws_route_table.public.id
+}
+
+resource "aws_route_table_association" "public_subnet_association_2" {
+  subnet_id      = aws_subnet.public2.id
   route_table_id = aws_route_table.public.id
 }
 
@@ -70,7 +83,6 @@ resource "aws_security_group" "ec2_sg" {
   vpc_id      = aws_vpc.main.id
 
   ingress {
-    description     = "Allow HTTP from ALB"
     from_port       = 3000
     to_port         = 3000
     protocol        = "tcp"
@@ -78,7 +90,6 @@ resource "aws_security_group" "ec2_sg" {
   }
 
   ingress {
-    description     = "Allow API from ALB"
     from_port       = 5000
     to_port         = 5000
     protocol        = "tcp"
@@ -86,7 +97,6 @@ resource "aws_security_group" "ec2_sg" {
   }
 
   ingress {
-    description = "Allow SSH from my IP"
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
@@ -109,13 +119,23 @@ resource "aws_ebs_volume" "mongo_volume" {
   }
 }
 
+data "aws_ami" "ubuntu" {
+  most_recent = true
+  owners      = ["099720109477"]
+
+  filter {
+    name   = "name"
+    values = ["ubuntu/images/hvm-ssd/ubuntu-focal-20.04-amd64-server-*"]
+  }
+}
+
 resource "aws_instance" "app_instance" {
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = var.instance_type
   subnet_id                   = aws_subnet.public.id
   vpc_security_group_ids      = [aws_security_group.ec2_sg.id]
   associate_public_ip_address = true
-  key_name                   = var.key_pair_name
+  key_name                    = var.key_pair_name
 
   root_block_device {
     volume_size = 30
@@ -123,21 +143,17 @@ resource "aws_instance" "app_instance" {
 
   user_data = <<-EOF
               #!/bin/bash
-              # update and install docker
               apt-get update -y
               apt-get install -y docker.io docker-compose git
               systemctl start docker
               systemctl enable docker
 
-              # clone repo
               cd /home/ubuntu
               if [ ! -d "${var.repo_name}" ]; then
                 git clone ${var.repo_clone_url}
               fi
 
               cd ${var.repo_name}
-
-              # run docker-compose
               docker-compose up -d
               EOF
 
@@ -148,22 +164,12 @@ resource "aws_instance" "app_instance" {
   }
 }
 
-data "aws_ami" "ubuntu" {
-  most_recent = true
-  owners      = ["099720109477"] # Canonical
-
-  filter {
-    name   = "name"
-    values = ["ubuntu/images/hvm-ssd/ubuntu-focal-20.04-amd64-server-*"]
-  }
-}
-
 resource "aws_lb" "app_alb" {
   name               = "app-alb"
   internal           = false
   load_balancer_type = "application"
   security_groups    = [aws_security_group.alb_sg.id]
-  subnets            = [aws_subnet.public.id]
+  subnets            = [aws_subnet.public.id, aws_subnet.public2.id]
 
   enable_deletion_protection = false
   tags = {
@@ -217,7 +223,7 @@ resource "aws_lb_listener" "http_listener" {
   protocol          = "HTTP"
 
   default_action {
-    type             = "fixed-response"
+    type = "fixed-response"
     fixed_response {
       content_type = "text/plain"
       message_body = "404: Not Found"
