@@ -1,6 +1,6 @@
 aws_region     = "us-east-1"
 instance_type  = "t2.micro"
-key_pair_name  = "vockey"
+key_pair_name  = "cloud9-key"
 my_ip          = "18.206.182.223/32"
 repo_clone_url = "https://github.com/ensarmesic/projekat1_web_app.git"
 repo_name      = "projekat1_web_app"
