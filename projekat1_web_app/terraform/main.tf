@@ -144,12 +144,15 @@ resource "aws_instance" "app_instance" {
     volume_size = 30
   }
 
- user_data = <<-EOF
+    user_data = <<-EOF
               #!/bin/bash
+              set -e  # zaustavi skriptu ako bilo šta pukne
+
+              # Ažuriranje i instalacije
               apt-get update -y
               apt-get install -y ca-certificates curl gnupg git
 
-              # Instalacija Dockera i Compose plugin-a
+              # Docker i docker-compose plugin
               install -m 0755 -d /etc/apt/keyrings
               curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
               chmod a+r /etc/apt/keyrings/docker.gpg
@@ -172,23 +175,25 @@ resource "aws_instance" "app_instance" {
               systemctl start docker
               systemctl enable docker
 
-              # Kloniranje repozitorija
+              # Kloniraj repozitorij u /home/ubuntu
               cd /home/ubuntu
               git clone ${var.repo_clone_url}
 
-              cd ${var.repo_name}/projekat1_web_app
+              cd ${var.repo_name}
 
-              # Kreiranje .env fajla u root folderu koji koriste i backend i frontend
+              # .env fajl u root folderu
               cat > .env <<EOL
 DB_URI=mongodb://mongo:27017/mydb
 SECRET_KEY=your_secret_key
 REACT_APP_API_URL=/api
 EOL
 
-              # Pokretanje aplikacije
+              # Pokreni docker
               docker compose up -d
-EOF
 
+              # Promijeni vlasništvo da ubuntu može sve vidjeti
+              chown -R ubuntu:ubuntu /home/ubuntu/${var.repo_name}
+EOF
 
   depends_on = [aws_ebs_volume.mongo_volume]
 
