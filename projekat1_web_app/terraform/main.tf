@@ -144,11 +144,26 @@ resource "aws_instance" "app_instance" {
     volume_size = 30
   }
 
-  user_data = <<-EOF
+ user_data = <<-EOF
               #!/bin/bash
               apt-get update -y
-              apt-get install -y docker.io docker-compose git
+              apt-get install -y ca-certificates curl gnupg git
 
+              # Instalacija Dockera i Compose plugin-a
+              install -m 0755 -d /etc/apt/keyrings
+              curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+              chmod a+r /etc/apt/keyrings/docker.gpg
+              echo \
+                "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+                $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+                tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+              apt-get update -y
+              apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+              usermod -aG docker ubuntu
+
+              # Montiranje EBS volumena
               mkfs.ext4 /dev/xvdf
               mkdir -p /var/lib/docker/volumes/mongo-data/_data
               mount /dev/xvdf /var/lib/docker/volumes/mongo-data/_data
@@ -157,12 +172,23 @@ resource "aws_instance" "app_instance" {
               systemctl start docker
               systemctl enable docker
 
+              # Kloniranje repozitorija
               cd /home/ubuntu
               git clone ${var.repo_clone_url}
 
-              cd ${var.repo_name}
-              docker-compose up -d
-              EOF
+              cd ${var.repo_name}/projekat1_web_app
+
+              # Kreiranje .env fajla u root folderu koji koriste i backend i frontend
+              cat > .env <<EOL
+DB_URI=mongodb://mongo:27017/mydb
+SECRET_KEY=your_secret_key
+REACT_APP_API_URL=/api
+EOL
+
+              # Pokretanje aplikacije
+              docker compose up -d
+EOF
+
 
   depends_on = [aws_ebs_volume.mongo_volume]
 
