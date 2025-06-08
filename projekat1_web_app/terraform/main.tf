@@ -144,56 +144,45 @@ resource "aws_instance" "app_instance" {
     volume_size = 30
   }
 
-    user_data = <<-EOF
+  user_data = <<-EOF
               #!/bin/bash
-              set -e  # zaustavi skriptu ako bilo šta pukne
+              set -e
 
-              # Ažuriranje i instalacije
+              # Update sistema
               apt-get update -y
-              apt-get install -y ca-certificates curl gnupg git
+              apt-get install -y git docker.io docker-compose
 
-              # Docker i docker-compose plugin
-              install -m 0755 -d /etc/apt/keyrings
-              curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-              chmod a+r /etc/apt/keyrings/docker.gpg
-              echo \
-                "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
-                $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
-                tee /etc/apt/sources.list.d/docker.list > /dev/null
-
-              apt-get update -y
-              apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-
+              # Dodaj korisnika ubuntu u docker grupu
               usermod -aG docker ubuntu
 
-              # Montiranje EBS volumena
+              # Omogući i pokreni Docker
+              systemctl enable docker
+              systemctl start docker
+
+              # Formatiraj i montiraj EBS volumen
               mkfs.ext4 /dev/xvdf
               mkdir -p /var/lib/docker/volumes/mongo-data/_data
               mount /dev/xvdf /var/lib/docker/volumes/mongo-data/_data
               echo "/dev/xvdf /var/lib/docker/volumes/mongo-data/_data ext4 defaults,nofail 0 2" >> /etc/fstab
 
-              systemctl start docker
-              systemctl enable docker
-
-              # Kloniraj repozitorij u /home/ubuntu
+              # Kloniraj GitHub repozitorij
               cd /home/ubuntu
               git clone ${var.repo_clone_url}
+              cd ${var.repo_name}/projekat1_web_app
 
-              cd ${var.repo_name}
-
-              # .env fajl u root folderu
-              cat > .env <<EOL
+              # Napravi .env fajl u root folderu projekta
+              cat <<EOT >> .env
 DB_URI=mongodb://mongo:27017/mydb
 SECRET_KEY=your_secret_key
 REACT_APP_API_URL=/api
-EOL
+EOT
 
-              # Pokreni docker
-              docker compose up -d
-
-              # Promijeni vlasništvo da ubuntu može sve vidjeti
+              # Promijeni vlasništvo nad folderima (radi sigurnosti)
               chown -R ubuntu:ubuntu /home/ubuntu/${var.repo_name}
-EOF
+
+              # Pokreni docker compose
+              docker-compose up -d
+  EOF
 
   depends_on = [aws_ebs_volume.mongo_volume]
 

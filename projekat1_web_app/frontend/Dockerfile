@@ -1,16 +1,25 @@
-FROM node:18
+# Build stage
+FROM node:18 AS build
 
 WORKDIR /app
 
-COPY package*.json ./
+COPY package.json ./
+COPY package-lock.json ./
+
 RUN npm install
 
 COPY . .
 
-# Build React app
 RUN npm run build
 
-# Serve statički build
-RUN npm install -g serve
-EXPOSE 3000
-CMD ["serve", "-s", "build"]
+# Production stage
+FROM nginx:stable-alpine
+
+COPY --from=build /app/build /usr/share/nginx/html
+
+# Custom NGINX config (optional, koristi default ako ne dodaješ config)
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]
