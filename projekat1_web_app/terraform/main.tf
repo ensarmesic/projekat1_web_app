@@ -144,28 +144,25 @@ resource "aws_instance" "app_instance" {
     volume_size = 30
   }
 
-  user_data = <<-EOF
+user_data = <<-EOF
               #!/bin/bash
               set -e
 
-              # Ažuriranje i instalacija paketa
+              # Ažuriranja i instalacije
               sudo apt-get update -y
               sudo apt-get install -y ca-certificates curl gnupg git
 
-              # Dodavanje Docker GPG ključa i repozitorija
+              # Instalacija Docker i Compose plugina
               sudo install -m 0755 -d /etc/apt/keyrings
               curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
               sudo chmod a+r /etc/apt/keyrings/docker.gpg
-              echo \
-                "deb [arch=\$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
-                \$(. /etc/os-release && echo \"$VERSION_CODENAME\") stable" | \
-                sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+              echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+              https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
+              | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 
-              # Instalacija Dockera i Compose plugina
               sudo apt-get update -y
               sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
-              # Dodavanje korisnika ubuntu u docker grupu
               sudo usermod -aG docker ubuntu
 
               # Montiranje EBS volumena
@@ -174,25 +171,27 @@ resource "aws_instance" "app_instance" {
               sudo mount /dev/xvdf /var/lib/docker/volumes/mongo-data/_data
               echo "/dev/xvdf /var/lib/docker/volumes/mongo-data/_data ext4 defaults,nofail 0 2" | sudo tee -a /etc/fstab
 
-              # Start Docker
               sudo systemctl start docker
               sudo systemctl enable docker
 
               # Kloniranje repozitorija
               cd /home/ubuntu
-              sudo git clone https://github.com/ensarmesic/projekat1_web_app.git
-              sudo chown -R ubuntu:ubuntu /home/ubuntu/projekat1_web_app
+              git clone ${var.repo_clone_url}
 
-              # Kreiranje .env fajla u root folderu repozitorija
-              cat > /home/ubuntu/projekat1_web_app/.env <<EOL
+              cd ${var.repo_name}/projekat1_web_app
+
+              # Kreiranje .env fajla
+              cat > .env <<EOL
 DB_URI=mongodb://mongo:27017/mydb
 SECRET_KEY=your_secret_key
 REACT_APP_API_URL=/api
 EOL
 
               # Pokretanje aplikacije
-              cd /home/ubuntu/projekat1_web_app
-              sudo -u ubuntu docker compose up -d
+              sudo docker compose up -d
+
+              # Promjena vlasništva nad fajlovima
+              sudo chown -R ubuntu:ubuntu /home/ubuntu/${var.repo_name}
 EOF
 
 
