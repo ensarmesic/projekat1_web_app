@@ -148,41 +148,53 @@ resource "aws_instance" "app_instance" {
               #!/bin/bash
               set -e
 
-              # Update sistema
-              apt-get update -y
-              apt-get install -y git docker.io docker-compose
+              # Ažuriranje i instalacija paketa
+              sudo apt-get update -y
+              sudo apt-get install -y ca-certificates curl gnupg git
 
-              # Dodaj korisnika ubuntu u docker grupu
-              usermod -aG docker ubuntu
+              # Dodavanje Docker GPG ključa i repozitorija
+              sudo install -m 0755 -d /etc/apt/keyrings
+              curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+              sudo chmod a+r /etc/apt/keyrings/docker.gpg
+              echo \
+                "deb [arch=\$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+                \$(. /etc/os-release && echo \"$VERSION_CODENAME\") stable" | \
+                sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 
-              # Omogući i pokreni Docker
-              systemctl enable docker
-              systemctl start docker
+              # Instalacija Dockera i Compose plugina
+              sudo apt-get update -y
+              sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
-              # Formatiraj i montiraj EBS volumen
-              mkfs.ext4 /dev/xvdf
-              mkdir -p /var/lib/docker/volumes/mongo-data/_data
-              mount /dev/xvdf /var/lib/docker/volumes/mongo-data/_data
-              echo "/dev/xvdf /var/lib/docker/volumes/mongo-data/_data ext4 defaults,nofail 0 2" >> /etc/fstab
+              # Dodavanje korisnika ubuntu u docker grupu
+              sudo usermod -aG docker ubuntu
 
-              # Kloniraj GitHub repozitorij
+              # Montiranje EBS volumena
+              sudo mkfs.ext4 /dev/xvdf
+              sudo mkdir -p /var/lib/docker/volumes/mongo-data/_data
+              sudo mount /dev/xvdf /var/lib/docker/volumes/mongo-data/_data
+              echo "/dev/xvdf /var/lib/docker/volumes/mongo-data/_data ext4 defaults,nofail 0 2" | sudo tee -a /etc/fstab
+
+              # Start Docker
+              sudo systemctl start docker
+              sudo systemctl enable docker
+
+              # Kloniranje repozitorija
               cd /home/ubuntu
-              git clone ${var.repo_clone_url}
-              cd ${var.repo_name}/projekat1_web_app
+              sudo git clone https://github.com/ensarmesic/projekat1_web_app.git
+              sudo chown -R ubuntu:ubuntu /home/ubuntu/projekat1_web_app
 
-              # Napravi .env fajl u root folderu projekta
-              cat <<EOT >> .env
+              # Kreiranje .env fajla u root folderu repozitorija
+              cat > /home/ubuntu/projekat1_web_app/.env <<EOL
 DB_URI=mongodb://mongo:27017/mydb
 SECRET_KEY=your_secret_key
 REACT_APP_API_URL=/api
-EOT
+EOL
 
-              # Promijeni vlasništvo nad folderima (radi sigurnosti)
-              chown -R ubuntu:ubuntu /home/ubuntu/${var.repo_name}
+              # Pokretanje aplikacije
+              cd /home/ubuntu/projekat1_web_app
+              sudo -u ubuntu docker compose up -d
+EOF
 
-              # Pokreni docker compose
-              docker-compose up -d
-  EOF
 
   depends_on = [aws_ebs_volume.mongo_volume]
 
