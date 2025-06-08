@@ -3,7 +3,9 @@ provider "aws" {
 }
 
 resource "aws_vpc" "main" {
-  cidr_block = "10.0.0.0/16"
+  cidr_block           = "10.0.0.0/16"
+  enable_dns_support   = true
+  enable_dns_hostnames = true
   tags = { Name = "app-vpc" }
 }
 
@@ -156,9 +158,7 @@ resource "aws_instance" "app_instance" {
               systemctl enable docker
 
               cd /home/ubuntu
-              if [ ! -d "${var.repo_name}" ]; then
-                git clone ${var.repo_clone_url}
-              fi
+              git clone ${var.repo_clone_url}
 
               cd ${var.repo_name}
               docker-compose up -d
