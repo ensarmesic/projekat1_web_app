@@ -7,6 +7,10 @@ RUN npm install
 
 COPY . .
 
+# Build React app
+RUN npm run build
+
+# Serve statički build
+RUN npm install -g serve
 EXPOSE 3000
-ENV HOST 0.0.0.0
-CMD ["npm", "start"]
+CMD ["serve", "-s", "build"]

@@ -1,6 +1,5 @@
 const fs = require('fs');
 const path = require('path');
-
 const express = require('express');
 const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
@@ -10,16 +9,22 @@ const Goal = require('./models/goal');
 
 const app = express();
 
-// Kreiranje log stream-a za pristupne logove
+// ✔️ Kreiranje logs foldera ako ne postoji
+const logDir = path.join(__dirname, 'logs');
+if (!fs.existsSync(logDir)) {
+  fs.mkdirSync(logDir);
+}
+
+// ✔️ Kreiranje log stream-a
 const accessLogStream = fs.createWriteStream(
-  path.join(__dirname, 'logs', 'access.log'),
+  path.join(logDir, 'access.log'),
   { flags: 'a' }
 );
 
 app.use(morgan('combined', { stream: accessLogStream }));
 app.use(bodyParser.json());
 
-// CORS zaglavlja
+// ✔️ CORS zaglavlja
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
@@ -27,7 +32,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// GET ciljeva
+// ✔️ GET ciljeva
 app.get('/goals', async (req, res) => {
   console.log('Pokušaj dohvatanja ciljeva');
   try {
@@ -46,7 +51,7 @@ app.get('/goals', async (req, res) => {
   }
 });
 
-// POST novi cilj
+// ✔️ POST novi cilj
 app.post('/goals', async (req, res) => {
   console.log('Pokušaj snimanja cilja');
   const goalText = req.body.text;
@@ -60,9 +65,7 @@ app.post('/goals', async (req, res) => {
 
   try {
     await goal.save();
-    res
-      .status(201)
-      .json({ message: 'Snimljen cilj', goal: { id: goal.id, text: goalText } });
+    res.status(201).json({ message: 'Snimljen cilj', goal: { id: goal.id, text: goalText } });
     console.log('Snimljen novi cilj');
   } catch (err) {
     console.error('Greška pri snimanju cilja');
@@ -71,7 +74,7 @@ app.post('/goals', async (req, res) => {
   }
 });
 
-// DELETE cilj
+// ✔️ DELETE cilj
 app.delete('/goals/:id', async (req, res) => {
   console.log('Pokušaj brisanja cilja');
   try {
@@ -85,23 +88,20 @@ app.delete('/goals/:id', async (req, res) => {
   }
 });
 
-// 🔧 Konekcija na MongoDB koristeći varijablu iz Docker okruženja
+// 🔧 Konekcija na MongoDB
 const dbURI = process.env.DB_URI;
 
-mongoose.connect(
-  dbURI,
-  {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-  },
-  (err) => {
-    if (err) {
-      console.error('Greška pri spajanju na MONGODB');
-      console.error(err);
-    } else {
-      console.log('Spojen sa MONGODB');
-      app.listen(5000);
-    }
-  }
-);
-
+mongoose.connect(dbURI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+})
+  .then(() => {
+    console.log('Spojen sa MONGODB');
+    app.listen(5000, () => {
+      console.log('Server slusa na portu 5000');
+    });
+  })
+  .catch(err => {
+    console.error('Greška pri spajanju na MONGODB');
+    console.error(err);
+  });

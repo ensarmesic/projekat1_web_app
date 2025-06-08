@@ -44,6 +44,7 @@ resource "aws_route" "internet_access" {
   route_table_id         = aws_route_table.public.id
   destination_cidr_block = "0.0.0.0/0"
   gateway_id             = aws_internet_gateway.igw.id
+  depends_on             = [aws_internet_gateway.igw]
 }
 
 resource "aws_route_table_association" "public_subnet_association_1" {
@@ -145,6 +146,12 @@ resource "aws_instance" "app_instance" {
               #!/bin/bash
               apt-get update -y
               apt-get install -y docker.io docker-compose git
+
+              mkfs.ext4 /dev/xvdf
+              mkdir -p /var/lib/docker/volumes/mongo-data/_data
+              mount /dev/xvdf /var/lib/docker/volumes/mongo-data/_data
+              echo "/dev/xvdf /var/lib/docker/volumes/mongo-data/_data ext4 defaults,nofail 0 2" >> /etc/fstab
+
               systemctl start docker
               systemctl enable docker
 
